@@ -9,6 +9,7 @@ Ask Claude things like *"Why is my pod crashing?"* or *"Scale nginx to 5 replica
 ## Table of Contents
 
 - [Overview](#overview)
+- [How It Works](#how-it-works)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Configuration](#configuration)
@@ -20,19 +21,113 @@ Ask Claude things like *"Why is my pod crashing?"* or *"Scale nginx to 5 replica
 
 ## Overview
 
+The server exposes **26 tools** across every major Kubernetes resource type. It reads your existing `~/.kube/config`, so no extra credentials are needed.
+
+---
+
+## How It Works
+
 ```
-Claude Desktop / Claude Code
-        │
-        │  MCP (stdio)
-        ▼
- kubernetes-mcp server
-        │
-        │  kubernetes Python client
-        ▼
-  ~/.kube/config → your cluster
+┌─────────────────────────────────────────────────────┐
+│            YOU (natural language)                   │
+│   "Why is my pod crashing?"                         │
+└─────────────────────┬───────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────┐
+│         CLAUDE DESKTOP / CLAUDE CODE                │
+│                                                     │
+│  • Reads your message                               │
+│  • Decides which MCP tool to call                   │
+│  • e.g. get_pod("crash-loop-demo", "default")       │
+└─────────────────────┬───────────────────────────────┘
+                      │
+                      │  MCP Protocol over stdio
+                      │  (JSON messages on stdin/stdout)
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────┐
+│           KUBERNETES MCP SERVER                     │
+│           (this project — main.py)                  │
+│                                                     │
+│  • Receives the tool call + arguments               │
+│  • Runs the matching Python function                │
+│  • Formats the result as a string                   │
+│  • Returns it back to Claude over stdio             │
+└─────────────────────┬───────────────────────────────┘
+                      │
+                      │  kubernetes Python client
+                      │  (HTTP/HTTPS API calls)
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────┐
+│             ~/.kube/config                          │
+│                                                     │
+│  • Holds cluster URL, certificates, auth token      │
+│  • Python client reads this automatically           │
+└─────────────────────┬───────────────────────────────┘
+                      │
+                      │  HTTPS (port 6443)
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────┐
+│           YOUR KUBERNETES CLUSTER                   │
+│           (kind / EKS / GKE / AKS etc.)             │
+│                                                     │
+│  • kube-apiserver processes the request             │
+│  • Returns pod status, logs, events, etc.           │
+└─────────────────────────────────────────────────────┘
 ```
 
-The server exposes **26 tools** across every major Kubernetes resource type. It reads your existing `~/.kube/config`, so no extra credentials are needed.
+### Layer by Layer
+
+**1. You → Claude**
+You type a plain English question. Claude's LLM understands the intent and maps it to one or more of the 26 tools — no kubectl, no YAML needed.
+
+**2. Claude → MCP Server (stdio)**
+MCP (Model Context Protocol) is a standard that lets Claude talk to external tools. Communication happens over **stdio** — Claude spawns the MCP server as a child process and exchanges JSON messages on stdin/stdout.
+
+```
+Claude sends →   {"tool": "get_pod", "args": {"pod_name": "crash-loop-demo"}}
+Server returns → {"result": "Pod: crash-loop-demo\nPhase: Running\n..."}
+```
+
+This is why the Claude Desktop config has:
+```json
+"command": "uv",
+"args": ["run", "main.py"]
+```
+Claude literally launches `main.py` as a subprocess and pipes messages to it.
+
+**3. MCP Server → kubernetes Python client**
+`kubernetes_mcp.py` calls the official `kubernetes` Python library — the same one used by tools like Helm and Argo. It translates each tool call into a Kubernetes REST API call:
+
+```python
+# list_pods("default")  becomes:
+client.CoreV1Api().list_namespaced_pod("default")
+```
+
+**4. Python client → `~/.kube/config`**
+Before making any API call, the client reads `~/.kube/config` to find:
+- **Cluster URL** — e.g. `https://127.0.0.1:6443`
+- **TLS certificates** — to trust the API server
+- **Auth token / credentials** — to prove who you are
+
+This is the same file `kubectl` uses — so if `kubectl get pods` works for you, the MCP server works too, with zero extra setup.
+
+**5. Python client → Kubernetes API Server**
+All requests go to the kube-apiserver over HTTPS on port 6443. The API server enforces **RBAC** (role-based access control) — the MCP server can only do what your kubeconfig user is permitted to do.
+
+### Why stdio instead of HTTP?
+
+| | stdio | HTTP server |
+|---|---|---|
+| Port management | No port needed | Requires open port |
+| Lifecycle | Exits when Claude closes | Stays running when unused |
+| Attack surface | Zero network exposure | Exposed to local network |
+| Setup | Zero config | Needs URL configuration |
+
+Claude spawns the process, uses it, and it exits cleanly — simple and secure.
 
 ---
 
