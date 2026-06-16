@@ -1,0 +1,17 @@
+[project]
+name = "kubernetes-mcp"
+version = "0.1.0"
+description = "Kubernetes MCP server for AI-driven cluster management"
+requires-python = ">=3.12"
+dependencies = [
+    "kubernetes>=31.0.0",
+    "mcp[cli]>=1.0.0",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+kubernetes-mcp = "main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
