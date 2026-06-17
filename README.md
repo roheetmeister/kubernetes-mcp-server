@@ -10,6 +10,7 @@ Ask Claude things like *"Why is my pod crashing?"* or *"Scale nginx to 5 replica
 
 - [Overview](#overview)
 - [How It Works](#how-it-works)
+- [Blue-Green Demo Setup](#blue-green-demo-setup)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Configuration](#configuration)
@@ -128,6 +129,111 @@ All requests go to the kube-apiserver over HTTPS on port 6443. The API server en
 | Setup | Zero config | Needs URL configuration |
 
 Claude spawns the process, uses it, and it exits cleanly — simple and secure.
+
+---
+
+## Blue-Green Demo Setup
+
+The `k8s/` directory contains a ready-to-run blue-green deployment demo — two versions of a webapp (blue v1.0 on nginx 1.24, green v2.0 on nginx 1.25) behind an nginx ingress. Use it to see the MCP server manage a real workload.
+
+### What's inside
+
+```
+k8s/
+├── 01-configmap-blue.yaml      # Blue HTML page served by nginx
+├── 02-configmap-green.yaml     # Green HTML page served by nginx
+├── 03-deployment-blue.yaml     # webapp-blue  — nginx:1.24, 2 replicas
+├── 04-deployment-green.yaml    # webapp-green — nginx:1.25, 2 replicas
+├── 05-service.yaml             # webapp service (selector points to active slot)
+├── 06-ingress.yaml             # nginx ingress → webapp:80
+└── deploy.sh                   # one-shot full redeploy script
+```
+
+### Step 1 — Create a kind cluster
+
+Save the following as `kind-config.yaml`:
+
+```yaml
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+  - role: worker
+  - role: worker
+```
+
+Then create the cluster:
+
+```bash
+kind create cluster --name kind --config kind-config.yaml
+```
+
+### Step 2 — Deploy everything
+
+```bash
+cd k8s
+bash deploy.sh
+```
+
+The script:
+1. Installs the ingress-nginx controller
+2. Waits for it to be ready
+3. Applies all ConfigMaps, Deployments, Service, and Ingress in order
+4. Waits for both deployments to roll out
+5. Starts a port-forward so the app is reachable at **http://localhost:8080**
+
+### Step 3 — Open the app
+
+```
+http://localhost:8080
+```
+
+You'll see the **Blue** page (active by default). Both blue and green deployments are running simultaneously.
+
+### Step 4 — Switch traffic between slots
+
+Cut over to green (zero downtime — just a label selector change on the Service):
+
+```bash
+kubectl patch svc webapp -p '{"spec":{"selector":{"version":"green"}}}'
+```
+
+Switch back to blue:
+
+```bash
+kubectl patch svc webapp -p '{"spec":{"selector":{"version":"blue"}}}'
+```
+
+Check which slot is currently live:
+
+```bash
+kubectl get svc webapp -o jsonpath='{.spec.selector.version}'
+```
+
+### Step 5 — Let Claude manage it
+
+Once the MCP server is configured (see [Configuration](#configuration)), you can drive the whole thing with natural language:
+
+> *"Which slot is currently active?"*
+> *"Switch traffic to the green deployment"*
+> *"Scale webapp-blue to 3 replicas"*
+> *"Show me the logs from the green pods"*
+
+### Recreating the cluster from scratch
+
+```bash
+kind delete cluster --name kind
+kind create cluster --name kind --config kind-config.yaml
+cd k8s && bash deploy.sh
+```
+
+All state is in the YAML files — nothing is lost when the cluster is deleted.
 
 ---
 
