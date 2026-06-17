@@ -23,3 +23,7 @@ build/
 
 # OS
 .DS_Store
+
+# LinkedIn / generated assets
+generate_diagram.py
+linkedin_diagram.png
