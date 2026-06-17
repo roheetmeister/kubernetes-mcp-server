@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp-blue
+  namespace: default
+  labels:
+    app: webapp
+    version: blue
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: webapp
+      version: blue
+  template:
+    metadata:
+      labels:
+        app: webapp
+        version: blue
+    spec:
+      containers:
+        - name: webapp
+          image: nginx:1.24
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - mountPath: /usr/share/nginx/html
+              name: html
+      volumes:
+        - name: html
+          configMap:
+            name: blue-page

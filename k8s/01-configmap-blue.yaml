@@ -1,0 +1,172 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blue-page
+  namespace: default
+data:
+  index.html: |-
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blue App - v1.0</title>
+    <style>
+      * { margin:0; padding:0; box-sizing:border-box; }
+      body {
+        min-height:100vh;
+        background: linear-gradient(135deg, #0f2d6b 0%, #1a56c4 50%, #2979ff 100%);
+        font-family: -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif;
+        color: white;
+        display: flex;
+        flex-direction: column;
+      }
+      nav {
+        padding: 1.2rem 2.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: rgba(0,0,0,0.2);
+        backdrop-filter: blur(10px);
+      }
+      .logo { font-size:1.3rem; font-weight:700; letter-spacing:2px; }
+      .nav-badge {
+        background: #4fc3f7;
+        color: #0d1b4b;
+        padding: 0.3rem 1rem;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 1px;
+      }
+      .hero {
+        flex:1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5rem;
+        padding: 3rem 4rem;
+      }
+      .hero-text h1 {
+        font-size: 3.5rem;
+        font-weight: 800;
+        letter-spacing: -1px;
+        line-height: 1.1;
+      }
+      .hero-text h1 span { color: #4fc3f7; }
+      .hero-text p {
+        margin-top: 1rem;
+        font-size: 1.1rem;
+        opacity: 0.8;
+        max-width: 380px;
+        line-height: 1.6;
+      }
+      .cards {
+        margin-top: 2.5rem;
+        display: flex;
+        gap: 1rem;
+      }
+      .card {
+        background: rgba(255,255,255,0.12);
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 12px;
+        padding: 1rem 1.5rem;
+        min-width: 130px;
+      }
+      .card-label { font-size:0.7rem; opacity:0.7; text-transform:uppercase; letter-spacing:1px; }
+      .card-value { font-size:1.3rem; font-weight:700; margin-top:0.3rem; }
+      .live-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 2rem;
+        background: rgba(79,195,247,0.2);
+        border: 1px solid #4fc3f7;
+        padding: 0.5rem 1.2rem;
+        border-radius: 999px;
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+      .dot {
+        width: 8px; height: 8px;
+        background: #4fc3f7;
+        border-radius: 50%;
+        animation: pulse 1.5s infinite;
+      }
+      @keyframes pulse {
+        0%,100% { opacity:1; transform:scale(1); }
+        50% { opacity:0.4; transform:scale(1.3); }
+      }
+      .illustration svg { filter: drop-shadow(0 20px 60px rgba(0,0,0,0.4)); }
+      footer {
+        text-align:center;
+        padding: 1rem;
+        font-size:0.75rem;
+        opacity:0.4;
+      }
+    </style>
+    </head>
+    <body>
+    <nav>
+      <div class="logo">K8S BLUE-GREEN DEMO</div>
+      <div class="nav-badge">BLUE ACTIVE</div>
+    </nav>
+    <div class="hero">
+      <div class="hero-text">
+        <h1>Blue<br><span>Deployment</span></h1>
+        <p>Stable production environment serving live traffic. This is Version 1 of the application running on nginx 1.24.</p>
+        <div class="cards">
+          <div class="card">
+            <div class="card-label">Version</div>
+            <div class="card-value">v1.0</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Server</div>
+            <div class="card-value">nginx 1.24</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Replicas</div>
+            <div class="card-value">3 / 3</div>
+          </div>
+        </div>
+        <div class="live-pill">
+          <div class="dot"></div>
+          Currently LIVE
+        </div>
+      </div>
+      <div class="illustration">
+        <svg width="320" height="300" viewBox="0 0 320 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="80" y="40" width="160" height="220" rx="16" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>
+          <rect x="100" y="65" width="120" height="28" rx="6" fill="rgba(79,195,247,0.3)" stroke="#4fc3f7" stroke-width="1"/>
+          <circle cx="212" cy="79" r="5" fill="#4fc3f7"/>
+          <rect x="108" y="73" width="60" height="4" rx="2" fill="rgba(255,255,255,0.4)"/>
+          <rect x="108" y="81" width="40" height="3" rx="1.5" fill="rgba(255,255,255,0.2)"/>
+          <rect x="100" y="105" width="120" height="28" rx="6" fill="rgba(79,195,247,0.3)" stroke="#4fc3f7" stroke-width="1"/>
+          <circle cx="212" cy="119" r="5" fill="#4fc3f7"/>
+          <rect x="108" y="113" width="60" height="4" rx="2" fill="rgba(255,255,255,0.4)"/>
+          <rect x="108" y="121" width="40" height="3" rx="1.5" fill="rgba(255,255,255,0.2)"/>
+          <rect x="100" y="145" width="120" height="28" rx="6" fill="rgba(79,195,247,0.3)" stroke="#4fc3f7" stroke-width="1"/>
+          <circle cx="212" cy="159" r="5" fill="#4fc3f7"/>
+          <rect x="108" y="153" width="60" height="4" rx="2" fill="rgba(255,255,255,0.4)"/>
+          <rect x="108" y="161" width="40" height="3" rx="1.5" fill="rgba(255,255,255,0.2)"/>
+          <rect x="100" y="190" width="120" height="50" rx="8" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+          <text x="160" y="210" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="9" font-family="monospace">SYSTEM STATUS</text>
+          <rect x="110" y="218" width="30" height="4" rx="2" fill="#4fc3f7"/>
+          <rect x="145" y="218" width="20" height="4" rx="2" fill="rgba(79,195,247,0.4)"/>
+          <rect x="110" y="226" width="50" height="4" rx="2" fill="rgba(79,195,247,0.3)"/>
+          <rect x="165" y="226" width="15" height="4" rx="2" fill="rgba(79,195,247,0.5)"/>
+          <circle cx="48" cy="100" r="18" fill="rgba(79,195,247,0.15)" stroke="#4fc3f7" stroke-width="1.5" stroke-dasharray="4 2"/>
+          <text x="48" y="105" text-anchor="middle" fill="#4fc3f7" font-size="10" font-weight="700">POD</text>
+          <circle cx="272" cy="130" r="18" fill="rgba(79,195,247,0.15)" stroke="#4fc3f7" stroke-width="1.5" stroke-dasharray="4 2"/>
+          <text x="272" y="135" text-anchor="middle" fill="#4fc3f7" font-size="10" font-weight="700">POD</text>
+          <circle cx="48" cy="190" r="18" fill="rgba(79,195,247,0.15)" stroke="#4fc3f7" stroke-width="1.5" stroke-dasharray="4 2"/>
+          <text x="48" y="195" text-anchor="middle" fill="#4fc3f7" font-size="10" font-weight="700">POD</text>
+          <line x1="66" y1="100" x2="80" y2="100" stroke="#4fc3f7" stroke-width="1" stroke-dasharray="3 2" opacity="0.5"/>
+          <line x1="240" y1="130" x2="254" y2="130" stroke="#4fc3f7" stroke-width="1" stroke-dasharray="3 2" opacity="0.5"/>
+          <line x1="66" y1="190" x2="80" y2="190" stroke="#4fc3f7" stroke-width="1" stroke-dasharray="3 2" opacity="0.5"/>
+        </svg>
+      </div>
+    </div>
+    <footer>Kubernetes Blue-Green Deployment Demo &mdash; kind-kind cluster v1.36.1</footer>
+    </body>
+    </html>

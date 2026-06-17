@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp
+  namespace: default
+  labels:
+    app: webapp
+spec:
+  selector:
+    app: webapp
+    version: blue        # active slot — change to "green" to cut over
+  ports:
+    - port: 80
+      targetPort: 80
