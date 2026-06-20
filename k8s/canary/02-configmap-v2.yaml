@@ -188,13 +188,13 @@ data:
         }
         .bar-stable {
           position: absolute; left: 0; top: 0; bottom: 0;
-          width: 80%;
+          width: ${STABLE_PCT}%;
           background: linear-gradient(90deg, #16a34a, #22c55e);
           border-radius: 999px;
         }
         .bar-canary {
           position: absolute; top: 0; bottom: 0;
-          left: 80%; right: 0;
+          left: ${STABLE_PCT}%; right: 0;
           background: linear-gradient(90deg, #d97706, #f59e0b);
           border-radius: 999px;
           animation: barGrow 1.4s cubic-bezier(.16,1,.3,1) both;
@@ -202,7 +202,7 @@ data:
         }
         @keyframes barGrow {
           from { left: 100%; }
-          to   { left: 80%; }
+          to   { left: ${STABLE_PCT}%; }
         }
 
         .traffic-legend {
@@ -268,14 +268,14 @@ data:
             <div class="legend-item">
               <div class="legend-swatch swatch-stable"></div>
               <div class="legend-info">
-                <div class="legend-pct pct-stable">80%</div>
+                <div class="legend-pct pct-stable">${STABLE_PCT}%</div>
                 <div class="legend-desc">v1 · Stable</div>
               </div>
             </div>
             <div class="legend-item">
               <div class="legend-swatch swatch-canary"></div>
               <div class="legend-info">
-                <div class="legend-pct pct-canary">20%</div>
+                <div class="legend-pct pct-canary">${CANARY_PCT}%</div>
                 <div class="legend-desc">v2 · Canary</div>
               </div>
             </div>
@@ -287,7 +287,7 @@ data:
           <div class="footer-dot"></div>
           <span>1 replica</span>
           <div class="footer-dot"></div>
-          <span>NGINX Ingress · canary-weight: 20</span>
+          <span>NGINX Ingress · canary-weight: ${WEIGHT}</span>
         </div>
       </div>
     </body>
