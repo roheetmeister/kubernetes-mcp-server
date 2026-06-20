@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp-stable
+  namespace: default
+  labels:
+    app: webapp
+    track: stable
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: webapp
+      track: stable
+  template:
+    metadata:
+      labels:
+        app: webapp
+        track: stable
+    spec:
+      containers:
+        - name: webapp
+          image: nginx:1.24
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - mountPath: /usr/share/nginx/html
+              name: html
+      volumes:
+        - name: html
+          configMap:
+            name: webapp-v1-page

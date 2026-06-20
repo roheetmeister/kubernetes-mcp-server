@@ -11,6 +11,7 @@ Ask Claude things like *"Why is my pod crashing?"* or *"Scale nginx to 5 replica
 - [Overview](#overview)
 - [How It Works](#how-it-works)
 - [Blue-Green Demo Setup](#blue-green-demo-setup)
+- [Canary Deployment Demo](#canary-deployment-demo)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Configuration](#configuration)
@@ -231,6 +232,231 @@ Once the MCP server is configured (see [Configuration](#configuration)), you can
 kind delete cluster --name kind
 kind create cluster --name kind --config kind-config.yaml
 cd k8s && bash deploy.sh
+```
+
+All state is in the YAML files — nothing is lost when the cluster is deleted.
+
+---
+
+## Canary Deployment Demo
+
+Canary deployment lets you roll out a new version to a **small percentage of real traffic** before committing to a full release. If the canary behaves well (no errors, latency stays low), you gradually increase its share until it handles 100% — then retire the old version. If something goes wrong, you roll back by setting the weight back to 0.
+
+**Blue-Green vs Canary at a glance:**
+
+| | Blue-Green | Canary |
+|---|---|---|
+| Traffic switch | 0% → 100% instantly | Gradual (e.g. 10% → 50% → 100%) |
+| Risk | Higher — all users see the new version at once | Lower — only a slice of users are exposed |
+| Rollback | Instant label swap | Set canary weight to 0 |
+| Use when | You want a clean cutover | You want to validate before full rollout |
+
+---
+
+### How It Works (NGINX Ingress Canary)
+
+```
+                        ┌─────────────────────────┐
+   All requests ──────► │  NGINX Ingress Controller│
+                        └────────┬────────┬────────┘
+                                 │        │
+                    canary-weight│        │remaining
+                          = 20% │        │ = 80%
+                                 ▼        ▼
+                   ┌─────────────────┐  ┌─────────────────┐
+                   │  webapp-canary  │  │  webapp-stable  │
+                   │   (v2 · 1 pod) │  │  (v1 · 3 pods) │
+                   └─────────────────┘  └─────────────────┘
+```
+
+The NGINX Ingress Controller evaluates `nginx.ingress.kubernetes.io/canary-weight` on every request and probabilistically forwards it to either the stable or canary backend. No service mesh required.
+
+---
+
+### What's Inside
+
+```
+k8s/canary/
+├── 01-configmap-v1.yaml      # Stable HTML page (v1, green theme)
+├── 02-configmap-v2.yaml      # Canary HTML page (v2, amber theme)
+├── 03-deployment-stable.yaml # webapp-stable — nginx:1.24, 3 replicas
+├── 04-deployment-canary.yaml # webapp-canary — nginx:1.25, 1 replica
+├── 05-service-stable.yaml    # ClusterIP service → stable pods
+├── 06-service-canary.yaml    # ClusterIP service → canary pods
+├── 07-ingress-stable.yaml    # Primary ingress → webapp-stable
+└── 08-ingress-canary.yaml    # Canary ingress  → webapp-canary (weight: 20)
+```
+
+The key annotation in `08-ingress-canary.yaml`:
+
+```yaml
+annotations:
+  nginx.ingress.kubernetes.io/canary: "true"
+  nginx.ingress.kubernetes.io/canary-weight: "20"   # 20% of traffic
+```
+
+---
+
+### Step 1 — Start Colima and create the cluster
+
+```bash
+colima start
+
+kind create cluster --name k8s-mcp --config k8s/kind-config.yaml
+```
+
+The `kind-config.yaml` spins up 1 control-plane + 2 worker nodes with the `ingress-ready=true` label needed by the NGINX controller.
+
+---
+
+### Step 2 — Install NGINX Ingress Controller
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.12.0/deploy/static/provider/kind/deploy.yaml
+
+# Wait until the controller pod is ready
+kubectl wait --namespace ingress-nginx \
+  --for=condition=ready pod \
+  --selector=app.kubernetes.io/component=controller \
+  --timeout=120s
+```
+
+---
+
+### Step 3 — Deploy the canary stack
+
+```bash
+kubectl apply -f k8s/canary/
+```
+
+Wait for both deployments:
+
+```bash
+kubectl wait --for=condition=available \
+  deployment/webapp-stable deployment/webapp-canary \
+  --timeout=90s
+```
+
+---
+
+### Step 4 — Open the app in your browser
+
+Start a port-forward and visit **http://localhost:8080**:
+
+```bash
+kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 8080:80
+```
+
+Keep refreshing — you'll see:
+
+| Page | Colour | What you'll see |
+|---|---|---|
+| **v1 · Stable** | Green | Traffic bar: 80% green / 20% amber |
+| **v2 · Canary** | Amber | Traffic bar: 80% green / 20% amber |
+
+Roughly 4 in every 5 refreshes land on v1 (stable), and 1 in 5 on v2 (canary).
+
+---
+
+### Step 5 — Verify the traffic split from the terminal
+
+```bash
+V1=0; V2=0
+for i in $(seq 1 20); do
+  resp=$(curl -s http://localhost:8080)
+  if echo "$resp" | grep -q "v1"; then V1=$((V1+1))
+  elif echo "$resp" | grep -q "v2"; then V2=$((V2+1))
+  fi
+done
+echo "v1 (stable): $V1/20"
+echo "v2 (canary): $V2/20"
+```
+
+Expected output (approximate):
+
+```
+v1 (stable): 16/20
+v2 (canary): 4/20
+```
+
+---
+
+### Step 6 — Adjust the canary weight
+
+Edit `k8s/canary/08-ingress-canary.yaml` and change the weight, then re-apply:
+
+```bash
+# Bump to 50 %
+kubectl annotate ingress webapp-canary \
+  nginx.ingress.kubernetes.io/canary-weight=50 \
+  --overwrite
+
+# Or edit the file and apply
+# canary-weight: "50"
+kubectl apply -f k8s/canary/08-ingress-canary.yaml
+```
+
+Typical promotion ladder:
+
+```
+10% → validate metrics → 30% → validate → 50% → 100% → retire v1
+```
+
+---
+
+### Step 7 — Promote canary to 100% (full rollout)
+
+Once satisfied, send all traffic to v2 by setting the weight to 100:
+
+```bash
+kubectl annotate ingress webapp-canary \
+  nginx.ingress.kubernetes.io/canary-weight=100 \
+  --overwrite
+```
+
+Then scale down the stable deployment and delete the old resources:
+
+```bash
+kubectl scale deployment webapp-stable --replicas=0
+
+# After verification, delete stable entirely
+kubectl delete deployment webapp-stable
+kubectl delete service webapp-stable
+kubectl delete ingress webapp-stable
+```
+
+---
+
+### Rollback — send all traffic back to v1
+
+If the canary has a problem, set its weight to 0 instantly:
+
+```bash
+kubectl annotate ingress webapp-canary \
+  nginx.ingress.kubernetes.io/canary-weight=0 \
+  --overwrite
+```
+
+100% of traffic immediately returns to v1 — no pod restarts, no downtime.
+
+---
+
+### Let Claude manage the canary
+
+Once the MCP server is running, you can control the whole rollout with natural language:
+
+> *"What percentage of traffic is going to the canary right now?"*
+> *"Scale the canary deployment to 2 replicas"*
+> *"Show me the logs from the canary pod"*
+> *"How many pods are in the webapp-canary deployment?"*
+> *"Delete the webapp-stable deployment"*
+
+---
+
+### Tear down
+
+```bash
+kind delete cluster --name k8s-mcp
 ```
 
 All state is in the YAML files — nothing is lost when the cluster is deleted.

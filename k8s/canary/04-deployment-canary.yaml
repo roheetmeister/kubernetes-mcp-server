@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp-canary
+  namespace: default
+  labels:
+    app: webapp
+    track: canary
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webapp
+      track: canary
+  template:
+    metadata:
+      labels:
+        app: webapp
+        track: canary
+    spec:
+      containers:
+        - name: webapp
+          image: nginx:1.25
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - mountPath: /usr/share/nginx/html
+              name: html
+      volumes:
+        - name: html
+          configMap:
+            name: webapp-v2-page
