@@ -135,50 +135,46 @@ Claude spawns the process, uses it, and it exits cleanly — simple and secure.
 
 ## Blue-Green Demo Setup
 
-The `k8s/` directory contains a ready-to-run blue-green deployment demo — two versions of a webapp (blue v1.0 on nginx 1.24, green v2.0 on nginx 1.25) behind an nginx ingress. Use it to see the MCP server manage a real workload.
+The `k8s/blue-green/` directory contains a ready-to-run blue-green deployment demo — two versions of a webapp (blue v1.0 on nginx 1.24, green v2.0 on nginx 1.25) behind an nginx ingress. Use it to see the MCP server manage a real workload.
 
 ### What's inside
 
 ```
 k8s/
-├── 01-configmap-blue.yaml      # Blue HTML page served by nginx
-├── 02-configmap-green.yaml     # Green HTML page served by nginx
-├── 03-deployment-blue.yaml     # webapp-blue  — nginx:1.24, 2 replicas
-├── 04-deployment-green.yaml    # webapp-green — nginx:1.25, 2 replicas
-├── 05-service.yaml             # webapp service (selector points to active slot)
-├── 06-ingress.yaml             # nginx ingress → webapp:80
-└── deploy.sh                   # one-shot full redeploy script
+├── kind-config.yaml                 # Shared cluster config (1 control-plane + 2 workers)
+├── blue-green/
+│   ├── 01-configmap-blue.yaml       # Blue HTML page served by nginx
+│   ├── 02-configmap-green.yaml      # Green HTML page served by nginx
+│   ├── 03-deployment-blue.yaml      # webapp-blue  — nginx:1.24, 2 replicas
+│   ├── 04-deployment-green.yaml     # webapp-green — nginx:1.25, 2 replicas
+│   ├── 05-service.yaml              # webapp service (selector points to active slot)
+│   ├── 06-ingress.yaml              # nginx ingress → webapp:80
+│   ├── deploy.sh                    # one-shot full redeploy script
+│   └── app/
+│       ├── blue/index.html          # Blue slot HTML source
+│       └── green/index.html         # Green slot HTML source
+└── canary/
+    ├── 01-configmap-v1.yaml         # Stable HTML template (placeholders)
+    ├── 02-configmap-v2.yaml         # Canary HTML template (placeholders)
+    ├── 03-deployment-stable.yaml    # webapp-stable — nginx:1.24, 3 replicas
+    ├── 04-deployment-canary.yaml    # webapp-canary — nginx:1.25, 1 replica
+    ├── 05-service-stable.yaml
+    ├── 06-service-canary.yaml
+    ├── 07-ingress-stable.yaml
+    ├── 08-ingress-canary.yaml       # canary-weight annotation
+    └── set-weight.sh                # One command to update traffic split
 ```
 
 ### Step 1 — Create a kind cluster
 
-Save the following as `kind-config.yaml`:
-
-```yaml
-kind: Cluster
-apiVersion: kind.x-k8s.io/v1alpha4
-nodes:
-  - role: control-plane
-    kubeadmConfigPatches:
-      - |
-        kind: InitConfiguration
-        nodeRegistration:
-          kubeletExtraArgs:
-            node-labels: "ingress-ready=true"
-  - role: worker
-  - role: worker
-```
-
-Then create the cluster:
-
 ```bash
-kind create cluster --name kind --config kind-config.yaml
+kind create cluster --name k8s-mcp --config k8s/kind-config.yaml
 ```
 
 ### Step 2 — Deploy everything
 
 ```bash
-cd k8s
+cd k8s/blue-green
 bash deploy.sh
 ```
 
@@ -229,9 +225,9 @@ Once the MCP server is configured (see [Configuration](#configuration)), you can
 ### Recreating the cluster from scratch
 
 ```bash
-kind delete cluster --name kind
-kind create cluster --name kind --config kind-config.yaml
-cd k8s && bash deploy.sh
+kind delete cluster --name k8s-mcp
+kind create cluster --name k8s-mcp --config k8s/kind-config.yaml
+cd k8s/blue-green && bash deploy.sh
 ```
 
 All state is in the YAML files — nothing is lost when the cluster is deleted.
